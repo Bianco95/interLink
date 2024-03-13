@@ -10,6 +10,7 @@ import (
 
 	exec "github.com/alexellis/go-execute/pkg/v1"
 	"github.com/containerd/containerd/log"
+	v1 "k8s.io/api/core/v1"
 
 	commonIL "github.com/intertwin-eu/interlink/pkg/common"
 )
@@ -34,6 +35,30 @@ func (h *SidecarHandler) CreateHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	for _, data := range req {
+
+		pathsOfVolumes := make(map[string]string)
+
+		for _, volume := range data.Pod.Spec.Volumes {
+			if volume.HostPath != nil {
+				if *volume.HostPath.Type == v1.HostPathDirectoryOrCreate || *volume.HostPath.Type == v1.HostPathDirectory {
+					_, err := os.Stat(volume.HostPath.Path + "/" + volume.Name)
+					if os.IsNotExist(err) {
+						log.G(h.Ctx).Info("-- Creating directory " + volume.HostPath.Path + "/" + volume.Name)
+						err = os.MkdirAll(volume.HostPath.Path+"/"+volume.Name, os.ModePerm)
+						if err != nil {
+							HandleErrorAndRemoveData(h, w, statusCode, "Some errors occurred while creating container. Check Docker Sidecar's logs", err, &data)
+						} else {
+							log.G(h.Ctx).Info("-- Created directory " + volume.HostPath.Path)
+							pathsOfVolumes[volume.Name] = volume.HostPath.Path + "/" + volume.Name
+						}
+					} else {
+						log.G(h.Ctx).Info("-- Directory " + volume.HostPath.Path + "/" + volume.Name + " already exists")
+						pathsOfVolumes[volume.Name] = volume.HostPath.Path + "/" + volume.Name
+					}
+				}
+			}
+		}
+
 		for _, container := range data.Pod.Spec.Containers {
 
 			var isGpuRequested bool = false
@@ -80,7 +105,44 @@ func (h *SidecarHandler) CreateHandler(w http.ResponseWriter, r *http.Request) {
 
 			log.G(h.Ctx).Info("- Creating container " + container.Name)
 
+			var envVars string = ""
+			// add environment variables to the docker command
+			for _, envVar := range container.Env {
+				if envVar.Value != "" {
+					// check if the env variable is an array, in this case the value needs to be between ''
+					if strings.Contains(envVar.Value, "[") {
+						envVars += " -e " + envVar.Name + "='" + envVar.Value + "'"
+					} else {
+						envVars += " -e " + envVar.Name + "=" + envVar.Value
+					}
+				} else {
+					envVars += " -e " + envVar.Name
+				}
+			}
+
+			// iterate over the container volumes and mount them in the docker command line; get the volume path in the host from pathsOfVolumes
+			for _, volumeMount := range container.VolumeMounts {
+				if volumeMount.MountPath != "" {
+
+					// check if volumeMount.name is inside pathsOfVolumes, if it is add the volume to the docker command
+					if _, ok := pathsOfVolumes[volumeMount.Name]; !ok {
+						log.G(h.Ctx).Error("Volume " + volumeMount.Name + " not found in pathsOfVolumes")
+						continue
+					}
+
+					if volumeMount.ReadOnly {
+						envVars += " -v " + pathsOfVolumes[volumeMount.Name] + ":" + volumeMount.MountPath + ":ro"
+					} else {
+						envVars += " -v " + pathsOfVolumes[volumeMount.Name] + ":" + volumeMount.MountPath
+					}
+				}
+			}
+
+			log.G(h.Ctx).Info("- Creating container " + container.Name)
+
 			cmd := []string{"run", "-d", "--name", container.Name}
+
+			cmd = append(cmd, envVars)
 
 			if isGpuRequested {
 				cmd = append(cmd, additionalGpuArgs...)
