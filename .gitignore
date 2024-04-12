@@ -2,7 +2,6 @@ vendor
 dist/*
 __pycache__/*
 vendor/*
-bin
 build.sh
 sidecars/slurm/.*
 cmd/sidecars/slurm/.*
