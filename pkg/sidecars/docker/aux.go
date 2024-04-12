@@ -11,14 +11,16 @@ import (
 	"github.com/containerd/containerd/log"
 	v1 "k8s.io/api/core/v1"
 
+	"fmt"
+
 	commonIL "github.com/intertwin-eu/interlink/pkg/common"
 	"github.com/intertwin-eu/interlink/pkg/sidecars/docker/gpustrategies"
 )
 
 type SidecarHandler struct {
-	Config commonIL.InterLinkConfig
-	Ctx    context.Context
-	GpuManager   gpustrategies.GPUManagerInterface
+	Config     commonIL.InterLinkConfig
+	Ctx        context.Context
+	GpuManager gpustrategies.GPUManagerInterface
 }
 
 // prepareMounts iterates along the struct provided in the data parameter and checks for ConfigMaps, Secrets and EmptyDirs to be mounted.
@@ -36,9 +38,17 @@ func prepareMounts(Ctx context.Context, config commonIL.InterLinkConfig, data []
 		} else {
 			log.G(Ctx).Info("-- Created directory " + config.DataRootFolder + podData.Pod.Namespace + "-" + string(podData.Pod.UID))
 		}
+
+		log.G(Ctx).Info("pod data values: " + fmt.Sprintf("%+v", podData))
+
 		for _, cont := range podData.Containers {
+
+			log.G(Ctx).Info("cont values: " + fmt.Sprintf("%+v", cont))
+
+			log.G(Ctx).Info("-- Inside Preparing mountpoints for " + cont.Name)
 			for _, cfgMap := range cont.ConfigMaps {
 				if container.Name == cont.Name {
+					log.G(Ctx).Info("-- Mounting ConfigMap " + cfgMap.Name)
 					paths, err := mountData(Ctx, config, podData.Pod, cfgMap, container)
 					if err != nil {
 						log.G(Ctx).Error("Error mounting ConfigMap " + cfgMap.Name)
@@ -95,8 +105,16 @@ func mountData(Ctx context.Context, config commonIL.InterLinkConfig, pod v1.Pod,
 		return nil, err
 	}
 
+	log.G(Ctx).Info("Inside mountData ")
+
 	if config.ExportPodData {
+
+		log.G(Ctx).Info("Mounting data for " + container.Name)
+
 		for _, mountSpec := range container.VolumeMounts {
+
+			log.G(Ctx).Info("Mounting " + mountSpec.Name + " at " + mountSpec.MountPath)
+
 			var podVolumeSpec *v1.VolumeSource
 
 			for _, vol := range pod.Spec.Volumes {
