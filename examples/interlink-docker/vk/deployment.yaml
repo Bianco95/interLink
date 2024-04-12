@@ -28,10 +28,8 @@ spec:
       - name: jaeger
         image: jaegertracing/all-in-one:1.51
       - name: inttw-vk
-        image: ghcr.io/intertwin-eu/virtual-kubelet-inttw:latest 
-        #image: dciangot/vk:latest
+        image: biancoj/vkgpu:latest 
         imagePullPolicy: Always
-        #command: ["sleep", "infinity"]
         env:
         - name: NODENAME
           value: test-vk
@@ -39,8 +37,6 @@ spec:
           valueFrom:
             fieldRef:
               fieldPath: status.podIP
-        #- name: KUBECONFIG
-        #  value: /etc/interlink/kubeconfig
         - name: KUBELET_PORT
           value: "10255"
         - name: INTERLINKCONFIGPATH
@@ -66,20 +62,17 @@ spec:
             cpu: 50m
             memory: 100Mi
       - name: refresh-token
-        image: ghcr.io/intertwin-eu/virtual-kubelet-inttw-refresh:latest
+        image: biancoj/refresh-token:latest
         imagePullPolicy: Always
         env:
         - name: IAM_SERVER
-          value: "https://dodas-iam.cloud.cnaf.infn.it/"
-        # TODO load env IAM client from secret
+          value: "https://iam.cloud.infn.it/"
         - name: IAM_CLIENT_ID
-          value: "DUMMY"
+          value: "CLIENT_ID"
         - name: IAM_CLIENT_SECRET
-          value: "DUMMY"
-        - name: IAM_REFRESH_TOKEN
-          value: "DUMMY"
+          value: "CLIENT_SECRET"
         - name: IAM_VK_AUD
-          value: intertw-vk
+          value: users
         - name: TOKEN_PATH
           value: /opt/interlink/token
         resources:

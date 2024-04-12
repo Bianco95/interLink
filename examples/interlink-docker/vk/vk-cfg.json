@@ -2,6 +2,7 @@
     "test-vk": {
         "cpu": "128", 
         "memory": "800Gi",
-        "pods": "1000"
+        "pods": "1000",
+        "nvidia.com/gpu": "1"
   }
 }
